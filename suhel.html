@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard IoT</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Arial', sans-serif;
+      background-color: #0f1b3f;
+      color: white;
+      text-align: center;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    h2 {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .temperature {
+      font-size: 48px;
+      font-weight: bold;
+    }
+
+    .status {
+      font-size: 20px;
+      color: #ffb347;
+      margin-bottom: 10px;
+    }
+
+    .humidity-container {
+      background: #1a2b5c;
+      border-radius: 15px;
+      padding: 20px;
+      margin: 20px auto;
+      width: 80%;
+      max-width: 300px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+
+    .circle {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 10px;
+      border-radius: 50%;
+      background: conic-gradient(#00bfff 0% 0%, #333 0% 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: bold;
+    }
+
+    .label {
+      font-size: 16px;
+      color: #aaa;
+    }
+
+    .switch-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 20px 0;
+    }
+
+    .switch-container label {
+      margin-left: 10px;
+      font-size: 18px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 26px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 26px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #4caf50;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+
+    .btn {
+      background-color: #007bff;
+      border: none;
+      color: white;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    .btn:hover {
+      background-color: #0056b3;
+    }
+
+    .pump-status {
+      font-size: 18px;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 10px;
+      width: fit-content;
+      margin-left: auto;
+      margin-right: auto;
+      background-color: #8b0000; /* Merah saat mati */
+      transition: background-color 0.3s;
+    }
+
+    .pump-status.active {
+      background-color: #00c853; /* Hijau saat aktif */
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Sistem Kontrol</h2>
+    <div class="temperature" id="suhu">--°C</div>
+    <div class="status" id="statusSuhu">--</div>
+
+    <div class="humidity-container">
+      <div class="circle" id="soilCircle">--%</div>
+      <div class="label" id="soilLabel">Kelembapan Tanah</div>
+    </div>
+
+    <div class="switch-container">
+      <div class="toggle-switch">
+        <input type="checkbox" id="toggleIrigasi" onchange="toggleDrip(this)">
+        <span class="slider"></span>
+      </div>
+      <label for="toggleIrigasi">Drip Irrigation</label>
+    </div>
+
+    <div class="pump-status" id="pumpStatus">Pompa: Mati</div>
+
+    <button class="btn" onclick="window.location.href='riwayat.html'">Riwayat</button>
+  </div>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+
+    client.on('connect', function () {
+      client.subscribe("suhu/iot");
+      client.subscribe("kelembapan/iot");
+    });
+
+    client.on('message', function (topic, message) {
+      const msg = message.toString();
+      if (topic === "suhu/iot") {
+        document.getElementById("suhu").innerText = msg + "°C";
+        document.getElementById("statusSuhu").innerText = parseInt(msg) >= 30 ? "Panas" : "Normal";
+      } else if (topic === "kelembapan/iot") {
+        const percent = parseInt(msg);
+        document.getElementById("soilCircle").innerText = percent + "%";
+        document.getElementById("soilCircle").style.background = `conic-gradient(#00bfff 0% ${percent}%, #333 ${percent}% 100%)`;
+        document.getElementById("soilLabel").innerText = percent < 30 ? "Kering" : "Lembap";
+      }
+    });
+
+    function toggleDrip(el) {
+      const cmd = el.checked ? 'on' : 'off';
+      client.publish("suhel/iot", cmd);
+
+      const pumpStatus = document.getElementById("pumpStatus");
+      if (el.checked) {
+        pumpStatus.innerText = "Pompa: Aktif";
+        pumpStatus.classList.add("active");
+      } else {
+        pumpStatus.innerText = "Pompa: Mati";
+        pumpStatus.classList.remove("active");
+      }
+    }
+  </script>
+</body>
+</html>
