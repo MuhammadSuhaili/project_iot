@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Riwayat Data IoT</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to bottom right, #e3f2fd, #ffffff);
+      color: #333;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 40px auto;
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      text-align: center;
+      color: #3e6088;
+      margin-bottom: 24px;
+    }
+
+    .filter-section {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .filter-section input[type="date"] {
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+
+    .filter-section button {
+      padding: 10px 20px;
+      background-color: #3e6088;
+      border: none;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .filter-section button:hover {
+      background-color: #0d47a1;
+    }
+
+    .log-entry {
+      background: #f1f8ff;
+      border-left: 6px solid #3e6088;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 16px 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+
+    .log-entry span {
+      display: block;
+      margin: 6px 0;
+      font-size: 15px;
+    }
+
+    .log-entry strong {
+      color: #3e6088;
+    }
+
+    .btn-back {
+      display: block;
+      text-align: center;
+      margin: 30px auto 0;
+      padding: 12px 24px;
+      background-color: #3e6088;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      text-decoration: none;
+      font-size: 16px;
+      width: fit-content;
+      transition: background-color 0.3s;
+    }
+
+    .btn-back:hover {
+      background-color: #0d47a1;
+    }
+
+    #log-container p {
+      text-align: center;
+      color: #666;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Riwayat Monitoring</h2>
+
+    <div class="filter-section">
+      <input type="date" id="filterDate">
+      <button onclick="applyFilter()">Tampilkan</button>
+    </div>
+
+    <div id="log-container">Memuat data dari Firebase...</div>
+    <a href="index1.html" class="btn-back">← Kembali ke Dashboard</a>
+  </div>
+
+  <script>
+    const apiKey = "AIzaSyAudzddrF8l-VxvmAD-oQr8-RtkPrzHt80";
+    const projectId = "irrigation-3395c";
+    const collection = "Riwayat";
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collection}?key=${apiKey}`;
+
+    let allDocs = [];
+
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        const docs = data.documents || [];
+
+        // Sort by waktu
+        docs.sort((a, b) => {
+          const timeA = a.fields?.waktu?.timestampValue || "";
+          const timeB = b.fields?.waktu?.timestampValue || "";
+          return timeB.localeCompare(timeA);
+        });
+
+        allDocs = docs;
+        renderLogs(docs);
+      })
+      .catch(err => {
+        document.getElementById("log-container").innerHTML = "<p style='color: red;'>Gagal memuat data dari Firebase.</p>";
+        console.error("Error saat mengambil data Firestore:", err);
+      });
+
+    function renderLogs(docs) {
+      const container = document.getElementById("log-container");
+      container.innerHTML = "";
+
+      if (docs.length === 0) {
+        container.innerHTML = "<p>Tidak ada data ditemukan.</p>";
+        return;
+      }
+
+      docs.forEach(doc => {
+        const f = doc.fields || {};
+        const waktuRaw = f.waktu?.timestampValue;
+        const waktu = waktuRaw ? new Date(waktuRaw).toLocaleString("id-ID") : "Tidak diketahui";
+        const status = f.status?.stringValue ?? "Tidak diketahui";
+        const suhu = f.suhu?.doubleValue ?? f.suhu?.integerValue ?? "N/A";
+        const kelembapan = f.kelembapan?.integerValue ?? f.kelembapan?.doubleValue ?? "N/A";
+
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+        entry.innerHTML = `
+          <span><strong>Waktu:</strong> ${waktu}</span>
+          <span><strong>Status Pompa:</strong> ${status}</span>
+          <span><strong>Suhu:</strong> ${suhu}°C</span>
+          <span><strong>Kelembapan:</strong> ${kelembapan}%</span>
+        `;
+        container.appendChild(entry);
+      });
+    }
+
+    function applyFilter() {
+      const selectedDate = document.getElementById("filterDate").value;
+      if (!selectedDate) {
+        renderLogs(allDocs);
+        return;
+      }
+
+      const filtered = allDocs.filter(doc => {
+        const waktuRaw = doc.fields?.waktu?.timestampValue;
+        if (!waktuRaw) return false;
+        const date = new Date(waktuRaw).toISOString().split("T")[0];
+        return date === selectedDate;
+      });
+
+      renderLogs(filtered);
+    }
+  </script>
+</body>
+</html>

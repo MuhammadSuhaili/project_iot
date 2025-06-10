@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard IoT</title>
+  <style>
+    /* (style tetap sama seperti kode aslimu) */
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to bottom right, #e3f2fd, #ffffff);
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .header {
+      background-color: #3e6088;
+      width: 100%;
+      padding: 15px 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .header-content img.logo {
+      height: 60px;
+      width: auto;
+      filter: brightness(0) invert(1);
+    }
+
+    .header-content h1 {
+      margin: 0;
+      font-size: 26px;
+      color: #ffffff;
+    }
+
+    .container {
+      max-width: 400px;
+      width: 90%;
+      margin-top: 30px;
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    /* Border khusus untuk suhu dan kelembapan */
+    .sensor-box {
+      border: 2px solid #3e6088;
+      border-radius: 12px;
+      padding: 16px 24px;
+      width: 140px;
+      box-shadow: 0 4px 10px rgba(62, 96, 136, 0.2);
+    }
+
+    .temperature {
+      font-size: 32px;
+      font-weight: 600;
+      color: #3e6088;
+    }
+
+    .status {
+      font-size: 16px;
+      margin-top: 4px;
+      color: #555;
+    }
+
+    .humidity-container {
+      margin: 30px 0;
+    }
+
+    .circle {
+      width: 140px;
+      height: 140px;
+      margin: 0 auto;
+      border-radius: 50%;
+      background: conic-gradient(#1e88e5 0% 0%, #e0e0e0 0% 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      color: #ffffff;
+      box-shadow: inset 0 0 8px rgba(0,0,0,0.2);
+    }
+
+    .label {
+      font-size: 16px;
+      margin-top: 12px;
+      color: #888;
+    }
+
+    .btn-group {
+      margin: 24px 0;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .btn-action {
+      background-color: #3e6088;
+      border: none;
+      color: white;
+      padding: 10px 24px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .btn-action:hover {
+      background-color: #0d47a1;
+    }
+
+    .pump-status {
+      margin-top: 16px;
+      padding: 10px 16px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 20px;
+      display: inline-block;
+      background-color: #ef5350;
+      color: #fff;
+      transition: all 0.3s;
+    }
+
+    .pump-status.active {
+      background-color: #43a047;
+    }
+
+    .btn {
+      margin-top: 20px;
+      background-color: #3e6088;
+      border: none;
+      color: white;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      transition: background-color 0.3s;
+    }
+
+    .btn:hover {
+      background-color: #0d47a1;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-content">
+      <img src="logo.png" alt="Logo" class="logo" />
+      <h1>Automated Irrigation System</h1>
+    </div>
+  </div>
+
+  <div class="container">
+    <div style="display: flex; justify-content: center; gap: 40px;">
+      <div class="sensor-box">
+        <div class="temperature" id="suhu">--°C</div>
+        <div class="status" id="statusSuhu">--</div>
+      </div>
+      <div class="sensor-box">
+        <div class="temperature" id="humidity">--%</div>
+        <div class="status" id="statusHumidity">--</div>
+      </div>
+    </div>
+
+    <div class="humidity-container">
+      <div class="circle" id="soilCircle">--</div>
+      <div class="label" id="soilLabel">Kelembapan Tanah</div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn-action" onclick="sendCommand('on')">ON</button>
+      <button class="btn-action" onclick="sendCommand('off')">OFF</button>
+    </div>
+ 
+    <div class="pump-status" id="pumpStatus">Pompa: Mati</div>
+
+    <button class="btn" onclick="window.location.href='riwayat1.html'">Riwayat</button>
+  </div>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+
+    client.on('connect', function () {
+      console.log("Terhubung ke broker MQTT");
+      client.subscribe("suhu/iot");
+      client.subscribe("kelembapan/iot");
+      client.subscribe("humidity/iot");  // subscribe topik kelembapan udara
+    });
+
+    client.on('message', function (topic, message) {
+      const msg = message.toString();
+
+      if (topic === "suhu/iot") {
+        const suhu = parseFloat(msg);
+        document.getElementById("suhu").innerText = suhu.toFixed(2) + "°C";
+        document.getElementById("statusSuhu").innerText = suhu >= 30 ? "Panas" : "Normal";
+
+      } else if (topic === "humidity/iot") {
+        const humidity = parseFloat(msg);
+        document.getElementById("humidity").innerText = humidity.toFixed(2) + "%";
+
+        let status = "";
+        if (humidity >= 70) {
+          status = "Lembap";
+        } else if (humidity >= 40) {
+          status = "Normal";
+        } else {
+          status = "Kering";
+        }
+        document.getElementById("statusHumidity").innerText = status;
+
+      } else if (topic === "kelembapan/iot") {
+        const nilaiADC = parseInt(msg);
+        let statusTanah = "";
+
+        if (nilaiADC <= 1000) {
+          statusTanah = "Tanah Basah";
+        } else if (nilaiADC <= 2000) {
+          statusTanah = "Tanah Lembap";
+        } else {
+          statusTanah = "Tanah Kering";
+        }
+
+        document.getElementById("soilCircle").innerText = nilaiADC;
+        document.getElementById("soilLabel").innerText = statusTanah;
+
+        const persentaseVisual = Math.round(((4095 - nilaiADC) / 4095) * 100);
+        document.getElementById("soilCircle").style.background =
+          `conic-gradient(#1e88e5 0% ${persentaseVisual}%, #e0e0e0 ${persentaseVisual}% 100%)`;
+      }
+    });
+
+    function sendCommand(cmd) {
+      console.log("Tombol diklik:", cmd);
+      client.publish("suhel/iot", cmd);
+
+      const pumpStatus = document.getElementById("pumpStatus");
+      if (cmd === "on") {
+        pumpStatus.innerText = "Pompa: Aktif";
+        pumpStatus.classList.add("active");
+      } else {
+        pumpStatus.innerText = "Pompa: Mati";
+        pumpStatus.classList.remove("active");
+      }
+    }
+  </script>
+</body>
+</html>
